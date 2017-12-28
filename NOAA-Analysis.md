@@ -1,5 +1,5 @@
 ---
-title: "Analysis of Storm Types for Economic and Health Damage"
+title: "Analysis of Weather Types for Economic and Health Damage"
 author: "Eric Scuccimarra"
 date: "28 December 2017"
 output: 
@@ -193,7 +193,10 @@ melted <- melt(top_health)
 ```
 
 
-## Result
+## Results
+
+## Economic Costs
+
 Now we can plot the events with the total and mean costs:
 
 ```r
@@ -206,20 +209,24 @@ barplot(economic_events$MEAN/1000000, names=economic_events$EVTYPE,ylab="Mean Da
 
 We see that floods cause by far greater total damage, followed by hurricanes, while in terms of mean damage hurricanes are by far the most destructive, followed by tsunamis. This is attributable to the fact that there are 36132 flood events in the data set, while only 109 hurricane events. Although on average a hurricane causes 93.10 times more economic damage than a flood, the much higher number of floods makes them the greatest contributer to economic damage.
 
-Total injuries and fatalties by event type:
+### Human Costs
+
+#### Total injuries and fatalities by event type:
+
 
 ```r
-ggplot(subset(melted,variable=="FATALITIES.TOTAL" | variable=="INJURIES.TOTAL"), aes(EVTYPE, value, fill=variable))+ geom_bar(stat="identity") + labs(y="Event Type",x="Total Injuries and Fatalities") + theme(legend.position="bottom")
+ggplot(subset(melted,variable=="FATALITIES.TOTAL" | variable=="INJURIES.TOTAL"), aes(EVTYPE, value, fill=factor(variable,labels=c("Fatalities","Injuries"))))+ geom_bar(stat="identity") + labs(y="Event Type",x="Total Injuries and Fatalities",fill="Type") + theme(legend.position="bottom")
 ```
 
 ![](NOAA-Analysis_files/figure-html/totalhealthplot-1.png)<!-- -->
 
 We see that tornadoes cause the greatest total number of fatalities and injuries, followed by floods.
 
-Mean injuries and fatalities by event type:
+#### Mean injuries and fatalities by event type:
+
 
 ```r
-ggplot(subset(melted,variable=="FATALITIES.MEAN" | variable=="INJURIES.MEAN"), aes(EVTYPE, value, fill=variable))+ geom_bar(stat="identity") + labs(x="Event Type",y="Mean Injuries and Fatalities") + theme(legend.position="bottom")
+ggplot(subset(melted,variable=="FATALITIES.MEAN" | variable=="INJURIES.MEAN"), aes(EVTYPE, value, fill=factor(variable, labels=c("Fatalities","Injuries"))))+ geom_bar(stat="identity") + labs(x="Event Type",y="Mean Injuries and Fatalities",fill="Type") + theme(legend.position="bottom")
 ```
 
 ![](NOAA-Analysis_files/figure-html/meanhealthplot-1.png)<!-- -->
@@ -230,7 +237,10 @@ As with economic effects, the average number of fatalities and injuries differ f
 
 As far as economic damage, floods cause the greatest total damage with hurricanes causing the greatest mean damage. While each flood does not cause a great deal of damage, the sheer number of them causes the damage made by each to add up. In contrast, a relatively small number of hurricanes each cause a massive amount of damage.
 
-In terms of fatalities and injuries, we observe a similar pattern. Tornados cause the most total injuries and fatalities, followed by floods. In terms of average number of injuries and fatalities, tsunamis cause the greatest average number of fatalities, however this is completely attributable to one outlier. Ignoring this data point, hurricanes have the highest average fatalities and injuries.
+In terms of fatalities and injuries, we observe a similar pattern. Tornados cause the most total injuries and fatalities, followed by floods. In terms of average number of injuries and fatalities, tsunamis cause the greatest average number of fatalities, however this is attributable to one outlier, as the remaining tsunamis cause no more than one injury or fatality each. If we exclude this outlier from the analysis, hurricanes have the highest average fatalities and injuries. In the health effects we also see that, despite a low average number of injuries caused by floods, the number of them causes the total injuries to add up.
+
+
+
 
 
 
