@@ -18,20 +18,20 @@ The purpose of this analysis is to determine which types of severe weather event
 
 We start by downloading the bzipped CSV file from the course website and loading the data in.
 
-```{r loaddata}
+```{r loaddata, cache=TRUE}
 download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
 data <- read.csv(bzfile("StormData.csv.bz2")) 
 ```
 
 Next we will remove the variables which are not relevant to the analysis.
 
-```{r preprocessdata}
+```{r preprocessdata,cache=TRUE}
 data <- data[, c("BGN_DATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
 ```
 
 The property and crop damage values are expressed in terms of a character which indicates whether the number is in hundreds, thousands, millions, or billions. To set the damage figures to be in dollars, we will convert the data accordingly. Once this is done we can remove the unneeded columns.
 
-```{r updatedamages}
+```{r updatedamages, cache=TRUE}
 data$PROPDMGEXP <- toupper(data$PROPDMGEXP)
 data$CROPDMGEXP <- toupper(data$CROPDMGEXP)
 
@@ -54,7 +54,7 @@ data$ECONDMG <- data$PROPDMG + data$CROPDMG
 data <- data[,-c(5,6)]
 ```
 
-Finally we will relabel the event types to generalize the results into more categories.
+Many of the hurricanes and storms are referenced individually by name, so in order to gauge which types of events are most damaging I attempted to group the types into 27 groups. When in doubt, I erred on the side of making the groups overly broad rather than overly specific with the assumption that this would provide the best generalized results.
 
 ```{r relabelevents}
 data$EVTYPE <- toupper(data$EVTYPE)
@@ -63,40 +63,58 @@ data$EVTYPE[grepl("FLD", data$EVTYPE)] <- "FLOOD"
 data$EVTYPE[grepl("HURRICANE", data$EVTYPE)] <- "HURRICANE"
 data$EVTYPE[grepl("THUNDERSTORM", data$EVTYPE)] <- "THUNDERSTORM"
 data$EVTYPE[grepl("STORM SURGE", data$EVTYPE)] <- "THUNDERSTORM"
+data$EVTYPE[grepl("TROPICAL DEPRESSION", data$EVTYPE)] <- "TROPICAL STORM"
 data$EVTYPE[grepl("TROPICAL STORM", data$EVTYPE)] <- "TROPICAL STORM"
 data$EVTYPE[grepl("TORNADO", data$EVTYPE)] <- "TORNADO"
+data$EVTYPE[grepl("GUSTNADO", data$EVTYPE)] <- "WIND"
 data$EVTYPE[grepl("WIND", data$EVTYPE)] <- "WIND"
-data$EVTYPE[grepl("HAIL", data$EVTYPE)] <- "HAIL"
+data$EVTYPE[grepl("SMOKE", data$EVTYPE)] <- "FIRE"
 data$EVTYPE[grepl("FIRE", data$EVTYPE)] <- "FIRE"
+data$EVTYPE[grepl("RIP CURRENT", data$EVTYPE)] <- "TIDE"
 data$EVTYPE[grepl("ASTRONOMICAL", data$EVTYPE)] <- "TIDE"
-data$EVTYPE[grepl("HEAT WAVE", data$EVTYPE)] <- "HEAT WAVE"
+data$EVTYPE[grepl("HEAT", data$EVTYPE)] <- "HEAT"
 data$EVTYPE[grepl("ICE", data$EVTYPE)] <- "ICE"
 data$EVTYPE[grepl("ICY", data$EVTYPE)] <- "ICE"
 data$EVTYPE[grepl("RAIN", data$EVTYPE)] <- "RAIN"
-data$EVTYPE[grepl("SNOW", data$EVTYPE)] <- "SNOW"
+data$EVTYPE[grepl("HAIL", data$EVTYPE)] <- "WINTER STORM"
+data$EVTYPE[grepl("SNOW", data$EVTYPE)] <- "WINTER STORM"
+data$EVTYPE[grepl("WINTER", data$EVTYPE)] <- "WINTER STORM"
+data$EVTYPE[grepl("BLIZZARD", data$EVTYPE)] <- "WINTER STORM"
+data$EVTYPE[grepl("SLEET", data$EVTYPE)] <- "WINTER STORM"
+data$EVTYPE[grepl("SURF", data$EVTYPE)] <- "SURF"
+data$EVTYPE[grepl("FREEZE", data$EVTYPE)] <- "EXTREME COLD"
+data$EVTYPE[grepl("FOG", data$EVTYPE)] <- "FOG"
+data$EVTYPE[grepl("DUST", data$EVTYPE)] <- "DUST STORM"
+data$EVTYPE <- as.factor(data$EVTYPE)
 ```
 
 ### Analysis
 
-```{r datasummary}
-summary(data)
-```
-
 First we will look at economic damage by storm type, considering both the mean damage and the total damage caused by each type of event:
 
 ```{r economicdamage}
-library(bplyr)
+library(dplyr)
 econ_dmg_total <- aggregate(ECONDMG ~ EVTYPE, data=data, sum)
 econ_dmg_mean <- aggregate(ECONDMG ~ EVTYPE, data=data, mean, na.rm=TRUE)
-econ_dmg_summary <- merge(econ_dmg_total, econ_dmg_mean, by="EVTYPE")
-names(econ_dmg_summary) <- c("EVTYPE","TOTAL","MEAN")
+econ_summary <- merge(econ_dmg_total, econ_dmg_mean, by="EVTYPE")
+names(econ_summary) <- c("EVTYPE","TOTAL","MEAN")
 ```
 
-A cursory examination of the data shows that 
+Now we will look at the top 5 types of events by mean damage and by total damage. To do this I sort the economic damage summary data by both total and mean, take the top 5 events for each, and then take the subset of the data which corresponds to the set of max events for either mean or total. This leaves 8 unique events.
 
-```{r orderecondata}
-head(econ_dmg_summary[order(desc(econ_dmg_summary$TOTAL)),])
-head(econ_dmg_summary[order(desc(econ_dmg_summary$MEAN)),])
+```{r econsummary}
+es_top_total <- econ_dmg_summary[order(desc(econ_dmg_summary$TOTAL))[1:5],]$EVTYPE
+es_top_mean <- econ_dmg_summary[order(desc(econ_dmg_summary$MEAN))[1:5],]$EVTYPE
+top_events <- subset(econ_summary, econ_summary$EVTYPE %in% es_top_total | econ_summary$EVTYPE %in% es_top_mean)
 ```
+
+Now we can plot the events with the total and mean costs:
+```{r ploteconsummary}
+par(mfrow=c(1,2))
+barplot(top_events$TOTAL/1000000, names=top_events$EVTYPE,ylab="Total Damage (in millions)",col=top_events$EVTYPE,legend.text=top_events$EVTYPE)
+barplot(top_events$MEAN/1000000, names=top_events$EVTYPE,ylab="Mean Damage (in millions)",col=top_events$EVTYPE)
+```
+
+We see that floods cause by far greater total damage, followed by hurricanes, while in terms of mean damage hurricanes are by far the most destructive, followed by tsunamis. This is attributable to the fact that there are `r sum(data$EVTYPE == "FLOOD")` flood events in the data set, while only `r sum(data$EVTYPE == "HURRICANE")` hurricane events. Although on average a hurricane causes 93.10 times more economic damage than a flood, the much higher number of floods makes them the greatest contributer to economic damage.
 
 [1]: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf "Data Description"
