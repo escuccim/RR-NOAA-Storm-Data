@@ -2,8 +2,9 @@
 title: "Analysis of Storm Types for Economic and Health Damage"
 author: "Eric Scuccimarra"
 date: "28 December 2017"
-output: html_document:
-    keep_md: true
+output: 
+    html_document:
+        keep_md: true
 ---
 
 ```{r setup, include=FALSE}
@@ -20,13 +21,13 @@ We start by downloading the bzipped CSV file from the course website and loading
 
 ```{r loaddata, cache=TRUE}
 download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
-data <- read.csv(bzfile("StormData.csv.bz2")) 
+rawdata <- read.csv(bzfile("StormData.csv.bz2")) 
 ```
 
 Next we will remove the variables which are not relevant to the analysis.
 
 ```{r preprocessdata,cache=TRUE}
-data <- data[, c("BGN_DATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+data <- rawdata[, c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
 ```
 
 The property and crop damage values are expressed in terms of a character which indicates whether the number is in hundreds, thousands, millions, or billions. To set the damage figures to be in dollars, we will convert the data accordingly. Once this is done we can remove the unneeded columns.
@@ -44,14 +45,14 @@ names(data)[names(data) == "VALUE"] <- "CROPDMGMOD"
 data$PROPDMG <- data$PROPDMG * data$PROPDMGMOD
 data$CROPDMG <- data$CROPDMG * data$CROPDMGMOD
 
-data <- data[,-c(1,2,9,10)]
+data <- data[,-c(1,2,8,9)]
 ```
 
 Finally we can combine the Property and Crop damage into one column since we are only concerned with total damage and the breakdown is not relevant to this analysis.
 
-```{r economicdamage}
+```{r totaleconomicdamage}
 data$ECONDMG <- data$PROPDMG + data$CROPDMG
-data <- data[,-c(5,6)]
+data <- data[,-c(4,5)]
 ```
 
 Many of the hurricanes and storms are referenced individually by name, so in order to gauge which types of events are most damaging I attempted to group the types into 27 groups. When in doubt, I erred on the side of making the groups overly broad rather than overly specific with the assumption that this would provide the best generalized results.
@@ -88,7 +89,9 @@ data$EVTYPE[grepl("DUST", data$EVTYPE)] <- "DUST STORM"
 data$EVTYPE <- as.factor(data$EVTYPE)
 ```
 
-### Analysis
+## Analysis
+
+### Economic Damage to Crops and Property
 
 First we will look at economic damage by storm type, considering both the mean damage and the total damage caused by each type of event:
 
@@ -100,11 +103,11 @@ econ_summary <- merge(econ_dmg_total, econ_dmg_mean, by="EVTYPE")
 names(econ_summary) <- c("EVTYPE","TOTAL","MEAN")
 ```
 
-Now we will look at the top 5 types of events by mean damage and by total damage. To do this I sort the economic damage summary data by both total and mean, take the top 5 events for each, and then take the subset of the data which corresponds to the set of max events for either mean or total. This leaves 8 unique events.
+Now we will look at the types of events by greatest mean damage and by greatest total damage. To do this I sort the economic damage summary data by both total and mean, take the top 5 events for each, and then take the subset of the data which corresponds to the set of max events for either mean or total. This leaves 8 unique events.
 
 ```{r econsummary}
-es_top_total <- econ_dmg_summary[order(desc(econ_dmg_summary$TOTAL))[1:5],]$EVTYPE
-es_top_mean <- econ_dmg_summary[order(desc(econ_dmg_summary$MEAN))[1:5],]$EVTYPE
+es_top_total <- econ_summary[order(desc(econ_summary$TOTAL))[1:5],]$EVTYPE
+es_top_mean <- econ_summary[order(desc(econ_summary$MEAN))[1:5],]$EVTYPE
 top_events <- subset(econ_summary, econ_summary$EVTYPE %in% es_top_total | econ_summary$EVTYPE %in% es_top_mean)
 ```
 
@@ -116,5 +119,37 @@ barplot(top_events$MEAN/1000000, names=top_events$EVTYPE,ylab="Mean Damage (in m
 ```
 
 We see that floods cause by far greater total damage, followed by hurricanes, while in terms of mean damage hurricanes are by far the most destructive, followed by tsunamis. This is attributable to the fact that there are `r sum(data$EVTYPE == "FLOOD")` flood events in the data set, while only `r sum(data$EVTYPE == "HURRICANE")` hurricane events. Although on average a hurricane causes 93.10 times more economic damage than a flood, the much higher number of floods makes them the greatest contributer to economic damage.
+
+### Population Health Damage
+
+Now we will investigate the effects on population health in terms of fatalities and injuries.
+
+```{r summarizehealtheffects}
+data$ECONDMG <- NULL
+data$TOTALHEALTH = data$FATALITIES + data$INJURIES
+health_means <- data %>% group_by(EVTYPE) %>% summarize_all(mean)
+health_sums <- data %>% group_by(EVTYPE) %>% summarize_all(sum)
+```
+
+Now we can merge the data by mean and by total:
+```{r mergehealthdata}
+health_summary <- merge(health_means,health_sums,by="EVTYPE",suffixes=c(".MEAN",".TOTAL"))
+```
+
+As with economic damage, I will get the top five event types by mean and total injuries and fatalities and then subset the data set to only include those events:
+```{r subsethealthdata}
+total_fatalities <- as.character(health_summary[order(desc(health_summary$FATALITIES.TOTAL))[1:5],]$EVTYPE)
+total_injuries <- as.character(health_summary[order(desc(health_summary$INJURIES.TOTAL))[1:5],]$EVTYPE)
+mean_fatalities <- as.character(health_summary[order(desc(health_summary$FATALITIES.MEAN))[1:5],]$EVTYPE)
+mean_injuries <- as.character(health_summary[order(desc(health_summary$INJURIES.MEAN))[1:5],]$EVTYPE)
+top_events = unique(c(total_fatalities,total_injuries,mean_fatalities,mean_injuries))
+top_health <- subset(health_summary, health_summary$EVTYPE %in% top_events)
+top_health$EVTYPE <- as.factor(top_health$EVTYPE)
+```
+
+Finally we can plot the types of events against the numbers of injuries, fatalities or both:
+```{r plothealthdata}
+
+```
 
 [1]: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf "Data Description"
