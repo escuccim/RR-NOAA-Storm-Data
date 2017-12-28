@@ -1,5 +1,5 @@
 ---
-title: "Analysis of Weather Types for Economic and Health Damage"
+title: "Analysis of Storm Types for Economic and Health Damage"
 author: "Eric Scuccimarra"
 date: "28 December 2017"
 output: 
@@ -7,9 +7,7 @@ output:
         keep_md: true
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 ## Abstract
 
@@ -19,20 +17,23 @@ The purpose of this analysis is to determine which types of severe weather event
 
 We start by downloading the bzipped CSV file from the course website and loading the data in.
 
-```{r loaddata, cache=TRUE}
+
+```r
 download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
 rawdata <- read.csv(bzfile("StormData.csv.bz2")) 
 ```
 
 Next we will remove the variables which are not relevant to the analysis.
 
-```{r preprocessdata,cache=TRUE}
+
+```r
 data <- rawdata[, c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
 ```
 
 The property and crop damage values are expressed in terms of a character which indicates whether the number is in hundreds, thousands, millions, or billions. To set the damage figures to be in dollars, we will convert the data accordingly. Once this is done we can remove the unneeded columns.
 
-```{r updatedamages, cache=TRUE}
+
+```r
 data$PROPDMGEXP <- toupper(data$PROPDMGEXP)
 data$CROPDMGEXP <- toupper(data$CROPDMGEXP)
 
@@ -50,14 +51,16 @@ data <- data[,-c(1,2,8,9)]
 
 Finally we can combine the Property and Crop damage into one column since we are only concerned with total damage and the breakdown is not relevant to this analysis.
 
-```{r totaleconomicdamage}
+
+```r
 data$ECONDMG <- data$PROPDMG + data$CROPDMG
 data <- data[,-c(4,5)]
 ```
 
 Many of the hurricanes and storms are referenced individually by name, so in order to gauge which types of events are most damaging I attempted to group the types into 27 groups. When in doubt, I erred on the side of making the groups overly broad rather than overly specific with the assumption that this would provide the best generalized results.
 
-```{r relabelevents}
+
+```r
 data$EVTYPE <- toupper(data$EVTYPE)
 data$EVTYPE[grepl("FLOOD", data$EVTYPE)] <- "FLOOD"
 data$EVTYPE[grepl("FLD", data$EVTYPE)] <- "FLOOD"
@@ -95,8 +98,29 @@ data$EVTYPE <- as.factor(data$EVTYPE)
 
 First we will look at economic damage by storm type, considering both the mean damage and the total damage caused by each type of event. To do this I calculate the total and mean damage caused by each type of event and then merge the two into one data frame.
 
-```{r economicdamage}
+
+```r
 library(dplyr)
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
 econ_dmg_total <- aggregate(ECONDMG ~ EVTYPE, data=data, sum)
 econ_dmg_mean <- aggregate(ECONDMG ~ EVTYPE, data=data, mean, na.rm=TRUE)
 econ_summary <- merge(econ_dmg_total, econ_dmg_mean, by="EVTYPE")
@@ -105,7 +129,8 @@ names(econ_summary) <- c("EVTYPE","TOTAL","MEAN")
 
 To keep the plots readable, I select the top 5 types of events by both total and mean damage, and then keep the 8 types of events which are in the union of the two sets of events.
 
-```{r econsummary}
+
+```r
 es_top_total <- econ_summary[order(desc(econ_summary$TOTAL))[1:5],]$EVTYPE
 es_top_mean <- econ_summary[order(desc(econ_summary$MEAN))[1:5],]$EVTYPE
 economic_events <- subset(econ_summary, econ_summary$EVTYPE %in% es_top_total | econ_summary$EVTYPE %in% es_top_mean)
@@ -116,7 +141,8 @@ economic_events <- subset(econ_summary, econ_summary$EVTYPE %in% es_top_total | 
 
 Next I perform a similar analysis on the health effects. I begin by creating two data frames summarizing the fatalities, injuries, and sum of the fatalities and injuries by event type, calculating both the sum and mean. Then I merge the two resulting data frames together.
 
-```{r summarizehealtheffects}
+
+```r
 data$ECONDMG <- NULL
 data$BOTH = data$FATALITIES + data$INJURIES
 health_means <- data %>% group_by(EVTYPE) %>% summarize_all(mean)
@@ -127,7 +153,8 @@ health_summary <- merge(health_means,health_sums,by="EVTYPE",suffixes=c(".MEAN",
 As with economic damage, in the interest of a readable plot I get the top four ranking events for total fatalities, total injuries, mean fatalities and mean injuries and subset the data to include only events in the union of the four highest ranking events. This leaves nine event types in the summary data set.
 
 
-```{r subsethealthdata}
+
+```r
 total_fatalities <- as.character(health_summary[order(desc(health_summary$FATALITIES.TOTAL))[1:4],]$EVTYPE)
 total_injuries <- as.character(health_summary[order(desc(health_summary$INJURIES.TOTAL))[1:4],]$EVTYPE)
 mean_fatalities <- as.character(health_summary[order(desc(health_summary$FATALITIES.MEAN))[1:4],]$EVTYPE)
@@ -139,35 +166,63 @@ top_health$EVTYPE <- as.factor(top_health$EVTYPE)
 
 Finally I melt the data for ease of plotting the variables against each other.
 
-```{r melthealthdata}
+
+```r
 library(reshape2)
 library(ggplot2)
 library(gridExtra)
+```
+
+```
+## 
+## Attaching package: 'gridExtra'
+```
+
+```
+## The following object is masked from 'package:dplyr':
+## 
+##     combine
+```
+
+```r
 melted <- melt(top_health)
+```
+
+```
+## Using EVTYPE as id variables
 ```
 
 
 ## Result
 Now we can plot the events with the total and mean costs:
-```{r ploteconsummary}
+
+```r
 par(mfrow=c(1,2))
 barplot(economic_events$TOTAL/1000000, names=economic_events$EVTYPE,ylab="Total Damage (in millions)",col=economic_events$EVTYPE,legend.text=economic_events$EVTYPE)
 barplot(economic_events$MEAN/1000000, names=economic_events$EVTYPE,ylab="Mean Damage (in millions)",col=economic_events$EVTYPE)
 ```
 
-We see that floods cause by far greater total damage, followed by hurricanes, while in terms of mean damage hurricanes are by far the most destructive, followed by tsunamis. This is attributable to the fact that there are `r sum(data$EVTYPE == "FLOOD")` flood events in the data set, while only `r sum(data$EVTYPE == "HURRICANE")` hurricane events. Although on average a hurricane causes 93.10 times more economic damage than a flood, the much higher number of floods makes them the greatest contributer to economic damage.
+![](NOAA-Analysis_files/figure-html/ploteconsummary-1.png)<!-- -->
+
+We see that floods cause by far greater total damage, followed by hurricanes, while in terms of mean damage hurricanes are by far the most destructive, followed by tsunamis. This is attributable to the fact that there are 36132 flood events in the data set, while only 109 hurricane events. Although on average a hurricane causes 93.10 times more economic damage than a flood, the much higher number of floods makes them the greatest contributer to economic damage.
 
 Total injuries and fatalties by event type:
-```{r totalhealthplot}
+
+```r
 ggplot(subset(melted,variable=="FATALITIES.TOTAL" | variable=="INJURIES.TOTAL"), aes(EVTYPE, value, fill=variable))+ geom_bar(stat="identity") + labs(y="Event Type",x="Total Injuries and Fatalities") + theme(legend.position="bottom")
 ```
+
+![](NOAA-Analysis_files/figure-html/totalhealthplot-1.png)<!-- -->
 
 We see that tornadoes cause the greatest total number of fatalities and injuries, followed by floods.
 
 Mean injuries and fatalities by event type:
-```{r meanhealthplot}
+
+```r
 ggplot(subset(melted,variable=="FATALITIES.MEAN" | variable=="INJURIES.MEAN"), aes(EVTYPE, value, fill=variable))+ geom_bar(stat="identity") + labs(x="Event Type",y="Mean Injuries and Fatalities") + theme(legend.position="bottom")
 ```
+
+![](NOAA-Analysis_files/figure-html/meanhealthplot-1.png)<!-- -->
 
 As with economic effects, the average number of fatalities and injuries differ from the total. Again hurricanes cause the greatest number of injuries on average, however tsunamis cause a greater number of fatalities on average. This appears to be caused by one outlier in the data. Out of the 19 tsunamis, 18 of them caused one or fewer injuries or fatalities.
 
