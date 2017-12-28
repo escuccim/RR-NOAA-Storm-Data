@@ -1,5 +1,5 @@
 ---
-title: "NOAA Storm Analysis"
+title: "Analysis of Storm Types for Economic and Health Damage"
 author: "Eric Scuccimarra"
 date: "28 December 2017"
 output: html_document:
@@ -12,15 +12,91 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Abstract
 
-Abstract goes here.
+The purpose of this analysis is to determine which types of severe weather events have the greatest impact on population health, and which have the greatest economic impact. To accomplish this we will look at storm data collected by NOAA from 1950 to 2011.
 
-## Data Processing
+## Data Loading and Preprocessing
 
 We start by downloading the bzipped CSV file from the course website and loading the data in.
 
 ```{r loaddata}
 download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
 data <- read.csv(bzfile("StormData.csv.bz2")) 
-
 ```
 
+Next we will remove the variables which are not relevant to the analysis.
+
+```{r preprocessdata}
+data <- data[, c("BGN_DATE","EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+```
+
+The property and crop damage values are expressed in terms of a character which indicates whether the number is in hundreds, thousands, millions, or billions. To set the damage figures to be in dollars, we will convert the data accordingly. Once this is done we can remove the unneeded columns.
+
+```{r updatedamages}
+data$PROPDMGEXP <- toupper(data$PROPDMGEXP)
+data$CROPDMGEXP <- toupper(data$CROPDMGEXP)
+
+exp_translations <- data.frame(EXP = c("H", "K","M","B"), VALUE=c(100,1000,1000000,1000000000))
+data <- merge(data, exp_translations, by.x = "PROPDMGEXP", by.y="EXP")
+names(data)[names(data) == "VALUE"] <- "PROPDMGMOD"
+data <- merge(data, exp_translations, by.x="CROPDMGEXP", by.y="EXP")
+names(data)[names(data) == "VALUE"] <- "CROPDMGMOD"
+
+data$PROPDMG <- data$PROPDMG * data$PROPDMGMOD
+data$CROPDMG <- data$CROPDMG * data$CROPDMGMOD
+
+data <- data[,-c(1,2,9,10)]
+```
+
+Finally we can combine the Property and Crop damage into one column since we are only concerned with total damage and the breakdown is not relevant to this analysis.
+
+```{r economicdamage}
+data$ECONDMG <- data$PROPDMG + data$CROPDMG
+data <- data[,-c(5,6)]
+```
+
+Finally we will relabel the event types to generalize the results into more categories.
+
+```{r relabelevents}
+data$EVTYPE <- toupper(data$EVTYPE)
+data$EVTYPE[grepl("FLOOD", data$EVTYPE)] <- "FLOOD"
+data$EVTYPE[grepl("FLD", data$EVTYPE)] <- "FLOOD"
+data$EVTYPE[grepl("HURRICANE", data$EVTYPE)] <- "HURRICANE"
+data$EVTYPE[grepl("THUNDERSTORM", data$EVTYPE)] <- "THUNDERSTORM"
+data$EVTYPE[grepl("STORM SURGE", data$EVTYPE)] <- "THUNDERSTORM"
+data$EVTYPE[grepl("TROPICAL STORM", data$EVTYPE)] <- "TROPICAL STORM"
+data$EVTYPE[grepl("TORNADO", data$EVTYPE)] <- "TORNADO"
+data$EVTYPE[grepl("WIND", data$EVTYPE)] <- "WIND"
+data$EVTYPE[grepl("HAIL", data$EVTYPE)] <- "HAIL"
+data$EVTYPE[grepl("FIRE", data$EVTYPE)] <- "FIRE"
+data$EVTYPE[grepl("ASTRONOMICAL", data$EVTYPE)] <- "TIDE"
+data$EVTYPE[grepl("HEAT WAVE", data$EVTYPE)] <- "HEAT WAVE"
+data$EVTYPE[grepl("ICE", data$EVTYPE)] <- "ICE"
+data$EVTYPE[grepl("ICY", data$EVTYPE)] <- "ICE"
+data$EVTYPE[grepl("RAIN", data$EVTYPE)] <- "RAIN"
+data$EVTYPE[grepl("SNOW", data$EVTYPE)] <- "SNOW"
+```
+
+### Analysis
+
+```{r datasummary}
+summary(data)
+```
+
+First we will look at economic damage by storm type, considering both the mean damage and the total damage caused by each type of event:
+
+```{r economicdamage}
+library(bplyr)
+econ_dmg_total <- aggregate(ECONDMG ~ EVTYPE, data=data, sum)
+econ_dmg_mean <- aggregate(ECONDMG ~ EVTYPE, data=data, mean, na.rm=TRUE)
+econ_dmg_summary <- merge(econ_dmg_total, econ_dmg_mean, by="EVTYPE")
+names(econ_dmg_summary) <- c("EVTYPE","TOTAL","MEAN")
+```
+
+A cursory examination of the data shows that 
+
+```{r orderecondata}
+head(econ_dmg_summary[order(desc(econ_dmg_summary$TOTAL)),])
+head(econ_dmg_summary[order(desc(econ_dmg_summary$MEAN)),])
+```
+
+[1]: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf "Data Description"
