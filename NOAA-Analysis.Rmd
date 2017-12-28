@@ -1,0 +1,26 @@
+---
+title: "NOAA Storm Analysis"
+author: "Eric Scuccimarra"
+date: "28 December 2017"
+output: html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+
+Abstract goes here.
+
+## Data Processing
+
+We start by downloading the bzipped CSV file from the course website and loading the data in.
+
+```{r loaddata}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
+data <- read.csv(bzfile("StormData.csv.bz2")) 
+
+```
+
